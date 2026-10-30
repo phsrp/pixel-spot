@@ -15,6 +15,8 @@ import dev.vibe.pixelspot.data.SpotifyAuth
 import dev.vibe.pixelspot.data.TrackItem
 import dev.vibe.pixelspot.data.UiSettings
 import dev.vibe.pixelspot.player.RemotePlayer
+import dev.vibe.pixelspot.update.AppUpdate
+import dev.vibe.pixelspot.update.AppUpdater
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,11 +63,14 @@ data class LibraryData(
     val loading: Boolean = true,
 )
 
+private const val UPDATE_INTERVAL_MS = 2 * 60 * 60 * 1000L
+
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     val prefs = Prefs(app)
     val auth = SpotifyAuth(prefs)
     private val api = SpotifyApi(auth)
     val player = RemotePlayer(app)
+    val updater = AppUpdater(app)
 
     val settings: StateFlow<UiSettings> = prefs.settings
 
@@ -100,8 +105,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var searchJob: Job? = null
     private var collectionJob: Job? = null
 
+    private var lastUpdateCheck = 0L
+
     init {
         if (auth.isLoggedIn) loadEverything()
+        // Checks when the app opens fresh, then every 2 hours for as long as it keeps running.
+        viewModelScope.launch {
+            while (true) {
+                checkForUpdatesIfDue()
+                delay(UPDATE_INTERVAL_MS)
+            }
+        }
     }
 
     // --- Login ---
@@ -289,6 +303,29 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val uri = c.contextUri ?: return
         player.play(uri)
         if (player.nowPlaying.value?.isShuffling != true) player.toggleShuffle()
+    }
+
+    // --- App updates ---
+
+    /** Also called when the app comes back, because timers can stall while the phone sleeps. */
+    fun checkForUpdatesIfDue() {
+        if (System.currentTimeMillis() - lastUpdateCheck < UPDATE_INTERVAL_MS) return
+        lastUpdateCheck = System.currentTimeMillis()
+        viewModelScope.launch { runCatching { updater.check() } }
+    }
+
+    /** The Settings button: always checks, and says what it found. */
+    fun checkForUpdatesNow(onResult: (String) -> Unit) {
+        lastUpdateCheck = System.currentTimeMillis()
+        viewModelScope.launch {
+            runCatching { updater.check(ignoreDismissed = true) }
+                .onSuccess { if (it == null) onResult("You're on the latest version.") }
+                .onFailure { onResult("Couldn't check for updates. Check your internet connection.") }
+        }
+    }
+
+    fun installUpdate(update: AppUpdate) {
+        viewModelScope.launch { updater.downloadAndInstall(update) }
     }
 
     // --- Add to playlist ---

@@ -34,6 +34,7 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         vm.connectPlayer(this)
         LockScreenService.sync(this)
+        vm.checkForUpdatesIfDue()
     }
 
     override fun onStop() {

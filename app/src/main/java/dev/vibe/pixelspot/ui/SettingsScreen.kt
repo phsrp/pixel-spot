@@ -74,6 +74,8 @@ fun SettingsScreen(
     onChange: ((UiSettings) -> UiSettings) -> Unit,
     onReconnect: () -> Unit,
     onLogout: () -> Unit,
+    appVersion: String,
+    onCheckForUpdates: () -> Unit,
 ) {
     Column(
         Modifier
@@ -140,6 +142,13 @@ fun SettingsScreen(
                 Button(onClick = onReconnect) { Text("Reconnect") }
                 OutlinedButton(onClick = onLogout) { Text("Log out") }
             }
+        }
+
+        Group("Updates") {
+            Text("Version $appVersion", style = MaterialTheme.typography.bodyLarge)
+            Text("Checks automatically when the app opens and every 2 hours while it runs.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = onCheckForUpdates) { Text("Check for updates") }
         }
 
         Group("About") {

@@ -64,6 +64,9 @@ fun PixelSpotApp(vm: MainViewModel, onLogin: (String) -> Unit) {
             } else {
                 MainScaffold(vm, onLogin)
             }
+
+            val update by vm.updater.state.collectAsStateWithLifecycle()
+            UpdateDialog(update, onUpdate = vm::installUpdate, onLater = vm.updater::dismiss)
         }
     }
 }
@@ -146,6 +149,12 @@ private fun MainScaffold(vm: MainViewModel, onLogin: (String) -> Unit) {
                     onChange = vm::updateSettings,
                     onReconnect = { vm.player.disconnect(); vm.connectPlayer(context) },
                     onLogout = vm::logout,
+                    appVersion = vm.updater.currentVersion,
+                    onCheckForUpdates = {
+                        vm.checkForUpdatesNow { msg ->
+                            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
                 )
             }
         }
