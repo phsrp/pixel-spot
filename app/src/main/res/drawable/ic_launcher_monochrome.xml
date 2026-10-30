@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed (monochrome) icon: the cookie with the triangle cut out. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.8" android:scaleY="0.8">
+        <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M54,26 C58,26 60,30 64,31 C68,32 72,30 75,33 C78,36 76,40 77,44 C78,48 82,50 82,54 C82,58 78,60 77,64 C76,68 78,72 75,75 C72,78 68,76 64,77 C60,78 58,82 54,82 C50,82 48,78 44,77 C40,76 36,78 33,75 C30,72 32,68 31,64 C30,60 26,58 26,54 C26,50 30,48 31,44 C32,40 30,36 33,33 C36,30 40,32 44,31 C48,30 50,26 54,26 Z M47,43 L65,54 L47,65 Z" />
+    </group>
+</vector>
