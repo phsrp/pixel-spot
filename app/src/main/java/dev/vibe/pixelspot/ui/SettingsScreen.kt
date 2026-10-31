@@ -176,8 +176,10 @@ private fun LockScreenGroup(settings: UiSettings, onChange: ((UiSettings) -> UiS
     // Android 14+ lets people switch off "full screen" notifications per app; we need them.
     val nm = context.getSystemService(NotificationManager::class.java)
     var fullScreenAllowed by remember { mutableStateOf(true) }
+    var instantAllowed by remember { mutableStateOf(true) }
     LifecycleResumeEffect(Unit) {
         fullScreenAllowed = Build.VERSION.SDK_INT < 34 || nm.canUseFullScreenIntent()
+        instantAllowed = Settings.canDrawOverlays(context)
         onPauseOrDispose { }
     }
 
@@ -201,6 +203,16 @@ private fun LockScreenGroup(settings: UiSettings, onChange: ((UiSettings) -> UiS
                 "Also shows it when you turn the screen off, dimmed, until the music stops (uses more battery)",
                 settings.lockScreenKeepOn,
             ) { v -> apply { it.copy(lockScreenKeepOn = v) } }
+            if (!instantAllowed && !settings.lockScreenKeepOn) {
+                Text(
+                    "Optional: allow \"Display over other apps\" so the player is ready the moment you wake your phone, with no delay.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Button(onClick = {
+                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
+                    runCatching { context.startActivity(intent) }
+                }) { Text("Remove the delay") }
+            }
             if (!fullScreenAllowed) {
                 Text("Android is blocking this app from appearing over the lock screen.", style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error)

@@ -13,6 +13,7 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.media.AudioManager
 import android.os.IBinder
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -51,8 +52,13 @@ class LockScreenService : Service() {
             when (intent.action) {
                 Intent.ACTION_SCREEN_ON ->
                     if (canOpen && getSystemService(KeyguardManager::class.java).isKeyguardLocked) showOverLockScreen()
-                Intent.ACTION_SCREEN_OFF ->
-                    if (canOpen && Prefs(context).settings.value.lockScreenKeepOn) showOverLockScreen()
+                Intent.ACTION_SCREEN_OFF -> when {
+                    !canOpen -> Unit
+                    Prefs(context).settings.value.lockScreenKeepOn -> showOverLockScreen()
+                    // Opens it behind the dark screen, ready for the next wake. If this can't
+                    // happen, the wake itself opens it, just with a short delay.
+                    Settings.canDrawOverlays(context) -> openWhileScreenOff()
+                }
                 Intent.ACTION_USER_PRESENT ->
                     getSystemService(NotificationManager::class.java).cancel(ID_SHOW)
             }
@@ -86,6 +92,13 @@ class LockScreenService : Service() {
             addAction(Intent.ACTION_USER_PRESENT)
         }
         ContextCompat.registerReceiver(this, screenEvents, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+    }
+
+    /** Unlike [showOverLockScreen], this doesn't wake the display. */
+    private fun openWhileScreenOff() {
+        val intent = Intent(this, LockPlayerActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION)
+        runCatching { startActivity(intent) }
     }
 
     private fun showOverLockScreen() {

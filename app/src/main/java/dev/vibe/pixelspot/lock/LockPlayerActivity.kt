@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.os.PowerManager
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -101,9 +102,8 @@ class LockPlayerActivity : ComponentActivity() {
         player = RemotePlayer(applicationContext)
         getSystemService(NotificationManager::class.java).cancel(LockScreenService.ID_SHOW)
 
-        // The phone may have been unlocked while this was opening (a quick fingerprint, say).
         val keepOn = prefs.settings.value.lockScreenKeepOn
-        if (!keepOn && !getSystemService(KeyguardManager::class.java).isKeyguardLocked) {
+        if (unlockedWhileAwake()) {
             finish()
             return
         }
@@ -147,6 +147,15 @@ class LockPlayerActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * True if the phone is on and not locked, so this screen shouldn't be in the way: a quick
+     * fingerprint unlock, say. While the screen is off the lock may just not have kicked in yet.
+     */
+    private fun unlockedWhileAwake(): Boolean =
+        !prefs.settings.value.lockScreenKeepOn &&
+            getSystemService(PowerManager::class.java).isInteractive &&
+            !getSystemService(KeyguardManager::class.java).isKeyguardLocked
+
     private fun setBrightness(value: Float) {
         window.attributes = window.attributes.apply { screenBrightness = value }
     }
@@ -161,6 +170,7 @@ class LockPlayerActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (unlockedWhileAwake()) finish()
         if (isFinishing) return
         prefs.clientId?.let { player.connect(this, it) }
     }
