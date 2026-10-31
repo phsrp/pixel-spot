@@ -184,7 +184,7 @@ private fun LockScreenGroup(settings: UiSettings, onChange: ((UiSettings) -> UiS
     Group("Lock screen") {
         SwitchRow(
             "Lock screen player",
-            "Shows a simple black player with a clock over the lock screen while music plays",
+            "Replaces your lock screen with a simple black player and clock while music plays",
             settings.lockScreenPlayer,
         ) { on ->
             if (on && Build.VERSION.SDK_INT >= 33 &&
@@ -198,7 +198,7 @@ private fun LockScreenGroup(settings: UiSettings, onChange: ((UiSettings) -> UiS
         if (settings.lockScreenPlayer) {
             SwitchRow(
                 "Always on",
-                "Keeps it showing, dimmed, until the music stops (uses more battery)",
+                "Also shows it when you turn the screen off, dimmed, until the music stops (uses more battery)",
                 settings.lockScreenKeepOn,
             ) { v -> apply { it.copy(lockScreenKeepOn = v) } }
             if (!fullScreenAllowed) {

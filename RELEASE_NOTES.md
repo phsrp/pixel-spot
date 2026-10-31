@@ -1,2 +1,4 @@
-- Automatic update checks: the app looks for a new version when it opens and every 2 hours while it runs
-- New "Check for updates" button in Settings, under Updates
+- Lock screen player now replaces your lock screen when you wake the phone, instead of popping up when the screen turns off. With Always on enabled, it still shows when the screen turns off
+- Fixed the screen turning itself back on after you turned it off
+- Rearrange your playlists: in Library, hold a playlist and drag it. The order is saved in Pixel Spot and also used on Home
+- See your queue: swipe up on the full player, or tap the new queue button at the top

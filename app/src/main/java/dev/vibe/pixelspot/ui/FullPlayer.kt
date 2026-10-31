@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -87,6 +88,7 @@ fun FullPlayer(
     onRepeat: () -> Unit,
     onLike: () -> Unit,
     onAddToPlaylist: () -> Unit,
+    onOpenQueue: () -> Unit,
 ) {
     val scheme = LocalMaterialTheme.current
     val onBase = scheme.onBackground
@@ -100,10 +102,11 @@ fun FullPlayer(
             .graphicsLayer { translationY = dragY.coerceAtLeast(0f) }
             .background(scheme.background)
             .pointerInput(Unit) {
-                // Swipe down to close, like PixelPlayer's sheet.
+                // Swipe down to close and up for the queue, like PixelPlayer's sheet.
                 detectVerticalDragGestures(
                     onDragEnd = {
                         if (dragY > with(density) { 140.dp.toPx() }) onCollapse()
+                        if (dragY < -with(density) { 80.dp.toPx() }) onOpenQueue()
                         dragY = 0f
                     },
                     onDragCancel = { dragY = 0f },
@@ -150,7 +153,7 @@ fun FullPlayer(
                 Box(
                     Modifier
                         .size(height = 42.dp, width = 50.dp)
-                        .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 50.dp, bottomStart = 6.dp, bottomEnd = 50.dp))
+                        .clip(RoundedCornerShape(topStart = 50.dp, topEnd = 6.dp, bottomStart = 50.dp, bottomEnd = 6.dp))
                         .background(scheme.surfaceContainerHigh)
                         .clickable {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(np.trackUri))
@@ -160,6 +163,17 @@ fun FullPlayer(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(Icons.AutoMirrored.Rounded.OpenInNew, "Open in Spotify", tint = scheme.tertiary, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(6.dp))
+                Box(
+                    Modifier
+                        .size(height = 42.dp, width = 50.dp)
+                        .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 50.dp, bottomStart = 6.dp, bottomEnd = 50.dp))
+                        .background(scheme.surfaceContainerHigh)
+                        .clickable(onClick = onOpenQueue),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(painterResource(R.drawable.rounded_queue_music_24), "Queue", tint = scheme.tertiary)
                 }
             }
 

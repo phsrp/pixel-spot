@@ -1,5 +1,6 @@
 package dev.vibe.pixelspot.lock
 
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -20,9 +21,9 @@ import dev.vibe.pixelspot.R
 import dev.vibe.pixelspot.data.Prefs
 
 /**
- * Waits in the background for the screen to turn off. If music is playing at that moment,
- * it opens [LockPlayerActivity] over the lock screen (the same "full-screen notification"
- * trick alarm apps use), so the player is there when you wake the phone.
+ * Opens [LockPlayerActivity] over the lock screen while music plays (the same "full-screen
+ * notification" trick alarm apps use). That trick wakes the display, so it normally runs when
+ * the phone is woken, replacing the lock screen. Only "Always on" also uses it at screen off.
  */
 class LockScreenService : Service() {
 
@@ -42,10 +43,19 @@ class LockScreenService : Service() {
         }
     }
 
-    private val screenOff = object : BroadcastReceiver() {
+    private val screenEvents = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            val audio = getSystemService(AudioManager::class.java)
-            if (audio.isMusicActive) showOverLockScreen()
+            val music = getSystemService(AudioManager::class.java).isMusicActive
+            // Already open: leave it. Reopening it here is what would wake a screen you just turned off.
+            val canOpen = music && !LockPlayerActivity.isOpen
+            when (intent.action) {
+                Intent.ACTION_SCREEN_ON ->
+                    if (canOpen && getSystemService(KeyguardManager::class.java).isKeyguardLocked) showOverLockScreen()
+                Intent.ACTION_SCREEN_OFF ->
+                    if (canOpen && Prefs(context).settings.value.lockScreenKeepOn) showOverLockScreen()
+                Intent.ACTION_USER_PRESENT ->
+                    getSystemService(NotificationManager::class.java).cancel(ID_SHOW)
+            }
         }
     }
 
@@ -64,13 +74,18 @@ class LockScreenService : Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_SERVICE)
             .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setContentTitle("Lock screen player is on")
-            .setContentText("Shows what's playing when you lock your phone")
+            .setContentText("Shows what's playing on your lock screen")
             .setContentIntent(open)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
         ServiceCompat.startForeground(this, ID_SERVICE, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        ContextCompat.registerReceiver(this, screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_USER_PRESENT)
+        }
+        ContextCompat.registerReceiver(this, screenEvents, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
     private fun showOverLockScreen() {
@@ -91,7 +106,7 @@ class LockScreenService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     override fun onDestroy() {
-        runCatching { unregisterReceiver(screenOff) }
+        runCatching { unregisterReceiver(screenEvents) }
         super.onDestroy()
     }
 

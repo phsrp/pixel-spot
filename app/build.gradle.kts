@@ -7,7 +7,7 @@ plugins {
 
 // Version: raise it for every release (see README, "What the version numbers mean").
 // The release tag must match it: version 1.0.0 is released with the tag v1.0.0.
-val appVersion = "1.1.0"
+val appVersion = "1.2.0"
 
 // Signing key. Its SHA-1 is registered in the Spotify dashboard, and Android only installs
 // updates signed with the same key, so every build must use this one key.
@@ -86,6 +86,7 @@ dependencies {
     implementation("androidx.browser:browser:1.10.0")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("sh.calvin.reorderable:reorderable:3.1.0")
     implementation("androidx.compose.ui:ui-text-google-fonts")
 
     // Used by the PixelPlayer UI pieces (album-art colour engine, smooth corners).

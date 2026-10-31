@@ -1,5 +1,6 @@
 package dev.vibe.pixelspot.ui
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -57,6 +59,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -72,6 +77,8 @@ import dev.vibe.pixelspot.data.TrackItem
 import dev.vibe.pixelspot.pixelplay.presentation.components.SmartImage
 import dev.vibe.pixelspot.pixelplay.ui.theme.GoogleSansRounded
 import java.util.Calendar
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyGridState
 
 /** Shared actions every list screen needs. */
 class ListActions(
@@ -246,10 +253,18 @@ fun SearchScreen(results: SearchResults, searching: Boolean, onQuery: (String) -
 private enum class LibTab(val label: String) { PLAYLISTS("Playlists"), ALBUMS("Albums") }
 
 @Composable
-fun LibraryScreen(data: LibraryData, actions: ListActions) {
+fun LibraryScreen(data: LibraryData, actions: ListActions, onMovePlaylist: (String, String) -> Unit) {
     var tab by rememberSaveable { mutableStateOf(LibTab.PLAYLISTS) }
+    val gridState = rememberLazyGridState()
+    val haptics = LocalHapticFeedback.current
+    val reorderState = rememberReorderableLazyGridState(gridState) { from, to ->
+        val fromId = from.key as? String
+        val toId = to.key as? String
+        if (fromId != null && toId != null) onMovePlaylist(fromId, toId)
+    }
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
+        state = gridState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = BottomBarSpace),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -261,6 +276,15 @@ fun LibraryScreen(data: LibraryData, actions: ListActions) {
                 LibTab.entries.forEach { t ->
                     FilterChip(selected = tab == t, onClick = { tab = t }, label = { Text(t.label) }, shape = RoundedCornerShape(50))
                 }
+            }
+        }
+        if (tab == LibTab.PLAYLISTS && data.playlists.size > 1) {
+            item(span = { GridItemSpan(2) }) {
+                Text(
+                    "Hold and drag a playlist to move it",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         item(span = { GridItemSpan(2) }) {
@@ -284,7 +308,18 @@ fun LibraryScreen(data: LibraryData, actions: ListActions) {
         if (data.loading) item(span = { GridItemSpan(2) }) { Loading() }
         when (tab) {
             LibTab.PLAYLISTS -> items(data.playlists, key = { it.id }) { p ->
-                ArtCard(p.name, "${p.owner} · ${p.trackCount}", p.imageUrl, null, onClick = { actions.openPlaylist(p) })
+                ReorderableItem(reorderState, key = p.id) { dragging ->
+                    val scale by animateFloatAsState(if (dragging) 1.06f else 1f, label = "dragScale")
+                    ArtCard(
+                        p.name, "${p.owner} · ${p.trackCount}", p.imageUrl, null,
+                        onClick = { actions.openPlaylist(p) },
+                        modifier = Modifier
+                            .graphicsLayer { scaleX = scale; scaleY = scale }
+                            .longPressDraggableHandle(
+                                onDragStarted = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
+                            ),
+                    )
+                }
             }
             LibTab.ALBUMS -> items(data.albums, key = { it.id }) { a ->
                 ArtCard(a.name, a.artists, a.imageUrl, null, onClick = { actions.openAlbum(a) })

@@ -50,6 +50,8 @@ data class SearchResults(
     val playlists: List<PlaylistItem> = emptyList(),
 )
 
+data class QueueData(val current: TrackItem?, val items: List<TrackItem>)
+
 class ApiException(val code: Int, message: String) : Exception(message)
 
 /**
@@ -118,6 +120,15 @@ class SpotifyApi(private val auth: SpotifyAuth) {
     /** Adds a song to the end of a playlist you own or collaborate on. */
     suspend fun addToPlaylist(playlistId: String, trackUri: String) {
         request("POST", "/playlists/$playlistId/items", JSONObject().put("uris", JSONArray().put(trackUri)))
+    }
+
+    /** What's playing and what's next in the Spotify app. */
+    suspend fun queue(): QueueData {
+        val j = get("/me/player/queue")
+        return QueueData(
+            current = j.optJSONObject("currently_playing")?.toTrack(),
+            items = j.optJSONArray("queue").objects().mapNotNull { it.toTrack() },
+        )
     }
 
     suspend fun recentlyPlayed(): List<TrackItem> =

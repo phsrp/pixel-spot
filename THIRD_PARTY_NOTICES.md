@@ -8,8 +8,8 @@ under the MIT licence. PixelPlayer switched to a proprietary licence on 12 May 2
 change is used here.
 
 Adapted files live in `app/src/main/java/dev/vibe/pixelspot/pixelplay/` (package renamed, small changes to fit
-Spotify). Layout ideas from PixelPlayer's full player and song list are reused in `ui/FullPlayer.kt` and
-`ui/Common.kt`. Icons in `app/src/main/res/drawable/` (`rounded_*`, `round_*`, `ic_music_placeholder`) and the
+Spotify). Layout ideas from PixelPlayer's full player, song list and queue are reused in `ui/FullPlayer.kt`,
+`ui/Common.kt` and `ui/QueueSheet.kt`. Icons in `app/src/main/res/drawable/` (`rounded_*`, `round_*`, `ic_music_placeholder`) and the
 font `app/src/main/res/font/gflex_variable.ttf` come from the same commit.
 
 The full MIT licence text from that commit is in `licenses/PixelPlayer-LICENSE.txt`:
@@ -23,6 +23,11 @@ The full MIT licence text from that commit is in `licenses/PixelPlayer-LICENSE.t
 `app/libs/spotify-app-remote-release-0.8.0.aar` is Spotify's official SDK, from
 https://github.com/spotify/android-sdk/releases, under the Apache License 2.0
 (`licenses/Spotify-Android-SDK-LICENSE.txt`). Use is subject to the Spotify Developer Terms.
+
+## Reorderable
+
+Playlist dragging uses [Reorderable](https://github.com/Calvin-LL/Reorderable) by Calvin Liang, under the
+Apache License 2.0.
 
 ## Google Sans Flex
 

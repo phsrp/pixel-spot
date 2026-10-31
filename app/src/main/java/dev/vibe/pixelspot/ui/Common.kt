@@ -131,9 +131,11 @@ fun ArtCard(
     width: Dp?,
     onClick: () -> Unit,
     shape: Shape = RoundedCornerShape(28.dp),
+    modifier: Modifier = Modifier,
 ) {
     Column(
         (if (width != null) Modifier.width(width) else Modifier.fillMaxWidth())
+            .then(modifier)
             .clickable(onClick = onClick)
     ) {
         SmartImage(

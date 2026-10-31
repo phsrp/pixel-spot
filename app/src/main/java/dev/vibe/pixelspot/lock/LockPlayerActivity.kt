@@ -79,6 +79,12 @@ import kotlin.random.Random
 /** A simple, mostly-black player that sits on top of the lock screen while music plays. */
 class LockPlayerActivity : ComponentActivity() {
 
+    companion object {
+        /** True from opening until closing, including while the screen is off. */
+        @Volatile var isOpen = false
+            private set
+    }
+
     private lateinit var prefs: Prefs
     private lateinit var player: RemotePlayer
 
@@ -94,9 +100,16 @@ class LockPlayerActivity : ComponentActivity() {
         prefs = Prefs(this)
         player = RemotePlayer(applicationContext)
         getSystemService(NotificationManager::class.java).cancel(LockScreenService.ID_SHOW)
+
+        // The phone may have been unlocked while this was opening (a quick fingerprint, say).
+        val keepOn = prefs.settings.value.lockScreenKeepOn
+        if (!keepOn && !getSystemService(KeyguardManager::class.java).isKeyguardLocked) {
+            finish()
+            return
+        }
+        isOpen = true
         ContextCompat.registerReceiver(this, unlocked, IntentFilter(Intent.ACTION_USER_PRESENT), ContextCompat.RECEIVER_NOT_EXPORTED)
 
-        val keepOn = prefs.settings.value.lockScreenKeepOn
         if (keepOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         setContent {
@@ -116,6 +129,13 @@ class LockPlayerActivity : ComponentActivity() {
                     onUnlock = ::unlock,
                     onDim = { dim -> setBrightness(if (dim && keepOn) 0.02f else -1f) },
                 )
+            }
+            // Don't stay on "Connecting…" if Spotify isn't answering.
+            LaunchedEffect(np == null) {
+                if (np == null) {
+                    delay(15_000)
+                    finish()
+                }
             }
             // Leave once the music has been paused for a minute, so the screen can sleep normally.
             LaunchedEffect(np?.isPaused) {
@@ -141,6 +161,7 @@ class LockPlayerActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (isFinishing) return
         prefs.clientId?.let { player.connect(this, it) }
     }
 
@@ -150,6 +171,7 @@ class LockPlayerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        isOpen = false
         runCatching { unregisterReceiver(unlocked) }
         super.onDestroy()
     }

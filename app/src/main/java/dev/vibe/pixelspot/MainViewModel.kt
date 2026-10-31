@@ -65,6 +65,13 @@ data class LibraryData(
 
 private const val UPDATE_INTERVAL_MS = 2 * 60 * 60 * 1000L
 
+data class QueueState(
+    val current: TrackItem? = null,
+    val items: List<TrackItem> = emptyList(),
+    val loading: Boolean = false,
+    val error: String? = null,
+)
+
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     val prefs = Prefs(app)
     val auth = SpotifyAuth(prefs)
@@ -102,6 +109,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val search = _search.asStateFlow()
     private val _searching = MutableStateFlow(false)
     val searching = _searching.asStateFlow()
+    private val _queue = MutableStateFlow(QueueState())
+    val queue = _queue.asStateFlow()
     private var searchJob: Job? = null
     private var collectionJob: Job? = null
 
@@ -162,7 +171,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val recent = runCatching { api.recentlyPlayed() }.getOrDefault(emptyList())
                 val top = runCatching { api.topTracks() }.getOrDefault(emptyList())
-                val playlists = api.myPlaylists().items
+                val playlists = arranged(api.myPlaylists().items)
                 _home.value = HomeData(recent, top, playlists, loading = false)
             } catch (e: Exception) {
                 _home.update { it.copy(loading = false, error = friendly(e)) }
@@ -184,9 +193,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             val albums = runCatching { api.savedAlbums().items }.getOrDefault(emptyList())
             val liked = runCatching { api.likedSongs().total }.getOrDefault(0)
-            _library.value = LibraryData(playlists, albums, liked, loading = false)
+            _library.value = LibraryData(arranged(playlists), albums, liked, loading = false)
             _playlistContents.value = emptyMap() // re-check playlists next time they're needed
         }
+    }
+
+    /** Applies the user's own order. Playlists they haven't placed yet stay on top, newest first. */
+    private fun arranged(playlists: List<PlaylistItem>): List<PlaylistItem> {
+        val order = prefs.playlistOrder
+        if (order.isEmpty()) return playlists
+        val position = order.withIndex().associate { (i, id) -> id to i }
+        val (placed, unplaced) = playlists.partition { it.id in position }
+        return unplaced + placed.sortedBy { position[it.id] }
+    }
+
+    /** Spotify has no way to reorder a library, so this order lives in the app. */
+    fun movePlaylist(fromId: String, toId: String) {
+        val list = _library.value.playlists.toMutableList()
+        val from = list.indexOfFirst { it.id == fromId }
+        val to = list.indexOfFirst { it.id == toId }
+        if (from < 0 || to < 0) return
+        list.add(to, list.removeAt(from))
+        prefs.playlistOrder = list.map { it.id }
+        _library.update { it.copy(playlists = list) }
+        _home.update { it.copy(playlists = arranged(it.playlists)) }
     }
 
     // --- Navigation ---
@@ -382,6 +412,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _playlistContents.update { it + (playlist.id to (it[playlist.id].orEmpty() - trackUri)) }
                 onResult(friendly(e))
             }
+        }
+    }
+
+    fun loadQueue() {
+        viewModelScope.launch {
+            _queue.update { it.copy(loading = true, error = null) }
+            runCatching { api.queue() }
+                .onSuccess { q -> _queue.value = QueueState(q.current, q.items) }
+                .onFailure { e -> _queue.update { it.copy(loading = false, error = friendly(e)) } }
         }
     }
 

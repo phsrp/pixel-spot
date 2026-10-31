@@ -31,10 +31,10 @@ data class UiSettings(
     val amoled: Boolean = false,
     val wavyProgress: Boolean = true,
     val roundedFont: Boolean = true,
-    /** Show a simple player over the lock screen while music plays. */
+    /** Show a simple player instead of the lock screen while music plays. */
     val lockScreenPlayer: Boolean = false,
-    /** Keep that screen on (dimmed) like an always-on display. */
-    val lockScreenKeepOn: Boolean = true,
+    /** Also show that player when the screen turns off, kept on and dimmed like an always-on display. */
+    val lockScreenKeepOn: Boolean = false,
 )
 
 /** Small wrapper around SharedPreferences for settings and login tokens. */
@@ -107,6 +107,11 @@ class Prefs(context: Context) {
     var pkceState: String?
         get() = sp.getString("pkceState", null)
         set(v) = sp.edit().putString("pkceState", v).apply()
+
+    /** Playlist ids in the order the user arranged them (empty = Spotify's order). */
+    var playlistOrder: List<String>
+        get() = sp.getString("playlistOrder", null)?.split(",")?.filter { it.isNotBlank() }.orEmpty()
+        set(v) = sp.edit().putString("playlistOrder", v.joinToString(",")).apply()
 
     fun clearTokens() {
         sp.edit().remove("accessToken").remove("refreshToken").remove("tokenExpiry").remove("grantedScopes").apply()

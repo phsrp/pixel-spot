@@ -45,6 +45,7 @@ import dev.vibe.pixelspot.Tab
 import dev.vibe.pixelspot.pixelplay.presentation.components.MiniPlayerContentInternal
 import dev.vibe.pixelspot.pixelplay.presentation.components.scoped.CustomNavigationBarItem
 import dev.vibe.pixelspot.player.RemoteStatus
+import kotlinx.coroutines.delay
 
 @Composable
 fun PixelSpotApp(vm: MainViewModel, onLogin: (String) -> Unit) {
@@ -83,6 +84,7 @@ private fun MainScaffold(vm: MainViewModel, onLogin: (String) -> Unit) {
     val me by vm.me.collectAsStateWithLifecycle()
     var playerOpen by rememberSaveable { mutableStateOf(false) }
     var addSheetOpen by rememberSaveable { mutableStateOf(false) }
+    var queueOpen by rememberSaveable { mutableStateOf(false) }
     val needsPlaylistPermission by vm.needsPlaylistPermission.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -140,7 +142,7 @@ private fun MainScaffold(vm: MainViewModel, onLogin: (String) -> Unit) {
                 }
                 Tab.LIBRARY -> {
                     val lib by vm.library.collectAsStateWithLifecycle()
-                    LibraryScreen(lib, actions)
+                    LibraryScreen(lib, actions, onMovePlaylist = vm::movePlaylist)
                 }
                 Tab.SETTINGS -> SettingsScreen(
                     settings = settings,
@@ -236,11 +238,21 @@ private fun MainScaffold(vm: MainViewModel, onLogin: (String) -> Unit) {
                     onRepeat = vm.player::toggleRepeat,
                     onLike = vm.player::toggleLike,
                     onAddToPlaylist = { addSheetOpen = true },
+                    onOpenQueue = { queueOpen = true },
                 )
             }
         }
 
         val current = np
+        if (queueOpen && current != null) {
+            val queue by vm.queue.collectAsStateWithLifecycle()
+            // Also refreshes when the song changes; Spotify needs a moment to update the queue.
+            LaunchedEffect(current.trackUri) {
+                delay(if (queue.current == null) 0 else 800)
+                vm.loadQueue()
+            }
+            QueueSheet(queue, isPlaying = !current.isPaused, onDismiss = { queueOpen = false })
+        }
         if (addSheetOpen && current != null) {
             val editable = remember(addSheetOpen) { vm.editablePlaylists() }
             val contents by vm.playlistContents.collectAsStateWithLifecycle()
