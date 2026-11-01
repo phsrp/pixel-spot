@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.media.AudioAttributes
 import android.media.AudioManager
 import android.os.IBinder
 import android.provider.Settings
@@ -46,7 +47,7 @@ class LockScreenService : Service() {
 
     private val screenEvents = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            val music = getSystemService(AudioManager::class.java).isMusicActive
+            val music = musicMayBePlaying()
             // Already open: leave it. Reopening it here is what would wake a screen you just turned off.
             val canOpen = music && !LockPlayerActivity.isOpen
             when (intent.action) {
@@ -92,6 +93,20 @@ class LockScreenService : Service() {
             addAction(Intent.ACTION_USER_PRESENT)
         }
         ContextCompat.registerReceiver(this, screenEvents, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+    }
+
+    /**
+     * A quick first check: is anything playing that could be music, rather than a video or game?
+     * Android won't say which app it is, so the player then asks Spotify before showing itself.
+     */
+    private fun musicMayBePlaying(): Boolean {
+        val audio = getSystemService(AudioManager::class.java)
+        return audio.isMusicActive && audio.activePlaybackConfigurations.any {
+            val attributes = it.audioAttributes
+            attributes.usage == AudioAttributes.USAGE_MEDIA &&
+                attributes.contentType != AudioAttributes.CONTENT_TYPE_MOVIE &&
+                attributes.contentType != AudioAttributes.CONTENT_TYPE_SPEECH
+        }
     }
 
     /** Unlike [showOverLockScreen], this doesn't wake the display. */

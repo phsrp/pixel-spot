@@ -1,1 +1,2 @@
-- Lock screen player: no more delay when you wake your phone. Turn it on in Settings → Lock screen → Remove the delay, which asks for Android's "Display over other apps" permission
+- Lock screen player now only appears while Spotify is playing, not for videos, games or paused music
+- If you pause on the lock screen player, it stays for a minute so you can press play again

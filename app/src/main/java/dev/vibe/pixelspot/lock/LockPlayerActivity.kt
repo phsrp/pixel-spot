@@ -70,6 +70,7 @@ import dev.vibe.pixelspot.data.ThemeMode
 import dev.vibe.pixelspot.pixelplay.ui.theme.GoogleSansRounded
 import dev.vibe.pixelspot.player.NowPlaying
 import dev.vibe.pixelspot.player.RemotePlayer
+import dev.vibe.pixelspot.player.RemoteStatus
 import dev.vibe.pixelspot.ui.PixelSpotTheme
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -118,30 +119,53 @@ class LockPlayerActivity : ComponentActivity() {
             val np by player.nowPlaying.collectAsStateWithLifecycle()
             // Always dark and pure black here: black pixels are switched off on OLED screens.
             val settings = base.copy(themeMode = ThemeMode.DARK, amoled = true)
+            val status by player.status.collectAsStateWithLifecycle()
+            var pausedHere by remember { mutableStateOf(false) }
             PixelSpotTheme(settings, artwork) {
-                LockPlayer(
-                    np = np,
-                    artwork = artwork,
-                    wavy = settings.wavyProgress,
-                    onPlayPause = player::togglePlay,
-                    onNext = player::next,
-                    onPrevious = player::previous,
-                    onUnlock = ::unlock,
-                    onDim = { dim -> setBrightness(if (dim && keepOn) 0.02f else -1f) },
-                )
+                val current = np
+                if (current != null && (!current.isPaused || pausedHere)) {
+                    LockPlayer(
+                        np = current,
+                        artwork = artwork,
+                        wavy = settings.wavyProgress,
+                        onPlayPause = {
+                            pausedHere = true
+                            player.togglePlay()
+                        },
+                        onNext = player::next,
+                        onPrevious = player::previous,
+                        onUnlock = ::unlock,
+                        onDim = { dim -> setBrightness(if (dim && keepOn) 0.02f else -1f) },
+                    )
+                } else {
+                    // Nothing shows until Spotify confirms it's playing.
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background)
+                    )
+                }
             }
-            // Don't stay on "Connecting…" if Spotify isn't answering.
+            LaunchedEffect(status) {
+                if (status is RemoteStatus.Failed || status == RemoteStatus.SpotifyNotInstalled) finish()
+            }
+            // Leave if Spotify isn't answering, which usually means it isn't playing.
             LaunchedEffect(np == null) {
                 if (np == null) {
-                    delay(15_000)
+                    delay(6_000)
                     finish()
                 }
             }
-            // Leave once the music has been paused for a minute, so the screen can sleep normally.
+            // Pausing on this screen leaves a minute to press play again. Anything else that
+            // isn't playing means this screen shouldn't be here.
             LaunchedEffect(np?.isPaused) {
-                if (np?.isPaused == true) {
-                    delay(60_000)
-                    finish()
+                when (np?.isPaused) {
+                    true -> {
+                        if (pausedHere) delay(60_000)
+                        finish()
+                    }
+                    false -> pausedHere = false
+                    null -> Unit
                 }
             }
         }
@@ -190,7 +214,7 @@ class LockPlayerActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun LockPlayer(
-    np: NowPlaying?,
+    np: NowPlaying,
     artwork: android.graphics.Bitmap?,
     wavy: Boolean,
     onPlayPause: () -> Unit,
@@ -256,47 +280,43 @@ private fun LockPlayer(
 
             Spacer(Modifier.weight(1f))
 
-            if (np != null) {
-                Box(
-                    Modifier
-                        .size(200.dp)
-                        .clip(MaterialShapes.Cookie12Sided.toShape())
-                        .background(scheme.surfaceContainerHigh)
-                ) {
-                    artwork?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
-                }
-                Spacer(Modifier.height(24.dp))
-                Text(np.title, style = MaterialTheme.typography.headlineSmall, fontFamily = GoogleSansRounded, fontWeight = FontWeight.Bold,
-                    color = scheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-                Text(np.artist, style = MaterialTheme.typography.titleMedium, color = scheme.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(16.dp))
+            Box(
+                Modifier
+                    .size(200.dp)
+                    .clip(MaterialShapes.Cookie12Sided.toShape())
+                    .background(scheme.surfaceContainerHigh)
+            ) {
+                artwork?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+            }
+            Spacer(Modifier.height(24.dp))
+            Text(np.title, style = MaterialTheme.typography.headlineSmall, fontFamily = GoogleSansRounded, fontWeight = FontWeight.Bold,
+                color = scheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+            Text(np.artist, style = MaterialTheme.typography.titleMedium, color = scheme.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(16.dp))
 
-                var position by remember { mutableLongStateOf(np.livePosition()) }
-                LaunchedEffect(np) {
-                    while (true) { position = np.livePosition(); if (np.isPaused) break; delay(500) }
+            var position by remember { mutableLongStateOf(np.livePosition()) }
+            LaunchedEffect(np) {
+                while (true) { position = np.livePosition(); if (np.isPaused) break; delay(500) }
+            }
+            LinearWavyProgressIndicator(
+                progress = { (position.toFloat() / np.durationMs.coerceAtLeast(1)).coerceIn(0f, 1f) },
+                amplitude = { if (wavy && !np.isPaused) 1f else 0f },
+                color = scheme.primary,
+                trackColor = scheme.surfaceContainerHighest,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                RoundButton(Icons.Rounded.SkipPrevious, "Previous", 56, scheme.surfaceContainerHigh, scheme.onSurface) {
+                    lastTouch = System.currentTimeMillis(); onPrevious()
                 }
-                LinearWavyProgressIndicator(
-                    progress = { (position.toFloat() / np.durationMs.coerceAtLeast(1)).coerceIn(0f, 1f) },
-                    amplitude = { if (wavy && !np.isPaused) 1f else 0f },
-                    color = scheme.primary,
-                    trackColor = scheme.surfaceContainerHighest,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(20.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                    RoundButton(Icons.Rounded.SkipPrevious, "Previous", 56, scheme.surfaceContainerHigh, scheme.onSurface) {
-                        lastTouch = System.currentTimeMillis(); onPrevious()
-                    }
-                    RoundButton(if (np.isPaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause, "Play or pause", 76, scheme.primary, scheme.onPrimary) {
-                        lastTouch = System.currentTimeMillis(); onPlayPause()
-                    }
-                    RoundButton(Icons.Rounded.SkipNext, "Next", 56, scheme.surfaceContainerHigh, scheme.onSurface) {
-                        lastTouch = System.currentTimeMillis(); onNext()
-                    }
+                RoundButton(if (np.isPaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause, "Play or pause", 76, scheme.primary, scheme.onPrimary) {
+                    lastTouch = System.currentTimeMillis(); onPlayPause()
                 }
-            } else {
-                Text("Connecting to Spotify…", color = scheme.onSurfaceVariant)
+                RoundButton(Icons.Rounded.SkipNext, "Next", 56, scheme.surfaceContainerHigh, scheme.onSurface) {
+                    lastTouch = System.currentTimeMillis(); onNext()
+                }
             }
 
             Spacer(Modifier.weight(1f))
